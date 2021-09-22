@@ -10,7 +10,39 @@ namespace Client
     {
         static async Task Main(string[] args)
         {
-            await ReadFromStreamAsync(GetCancellationToken());
+            //Just read stream
+            //await ReadFromStreamAsync(GetCancellationToken());
+
+            //Check response status and read stream
+            await CheckResponseStatusAndStreamAsync(GetCancellationToken());
+        }
+
+        static async Task CheckResponseStatusAndStreamAsync(CancellationToken token)
+        {
+            using var httpClient = new HttpClient();
+            try
+            {
+                var response = await httpClient.GetAsync("https://localhost:7001/streams/300", HttpCompletionOption.ResponseHeadersRead, token);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    using var reader = new StreamReader(stream);
+                    while (!reader.EndOfStream)
+                    {
+                        var line = await reader.ReadLineAsync();
+                        Console.Out.WriteLine(line);
+                    }
+                }
+                else
+                {
+                    //handle response errors
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(ex.ToString());
+            }
         }
 
         static async Task ReadFromStreamAsync(CancellationToken token)
@@ -19,13 +51,11 @@ namespace Client
             var stream = await httpClient.GetStreamAsync("https://localhost:7001/streams/300", token);
             try
             {
-                using (var reader = new StreamReader(stream))
+                using var reader = new StreamReader(stream);
+                while (!reader.EndOfStream)
                 {
-                    while (!reader.EndOfStream)
-                    {
-                        var line = await reader.ReadLineAsync();
-                        Console.Out.WriteLine(line);
-                    }
+                    var line = await reader.ReadLineAsync();
+                    Console.Out.WriteLine(line);
                 }
             }
             catch (Exception ex)
@@ -37,7 +67,7 @@ namespace Client
         static CancellationToken GetCancellationToken()
         {
             var tokenSource = new CancellationTokenSource();
-            Console.CancelKeyPress += (sender, e) => 
+            Console.CancelKeyPress += (sender, e) =>
             {
                 e.Cancel = false;
                 tokenSource.Cancel();
